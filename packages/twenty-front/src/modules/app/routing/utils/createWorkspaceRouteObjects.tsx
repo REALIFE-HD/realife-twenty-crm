@@ -53,6 +53,12 @@ const NotFound = lazy(() =>
   })),
 );
 
+const BusinessDashboardPage = lazy(() =>
+  import('~/pages/business-dashboard/BusinessDashboardPage').then((module) => ({
+    default: module.BusinessDashboardPage,
+  })),
+);
+
 type CreateWorkspaceRouteObjectsArgs = {
   isAdminPageEnabled?: boolean;
 };
@@ -126,6 +132,14 @@ export const createWorkspaceRouteObjects = ({
       element: (
         <LazyRoute>
           <MobileHomePage />
+        </LazyRoute>
+      ),
+    },
+    {
+      path: AppPath.BusinessDashboard,
+      element: (
+        <LazyRoute>
+          <BusinessDashboardPage />
         </LazyRoute>
       ),
     },
