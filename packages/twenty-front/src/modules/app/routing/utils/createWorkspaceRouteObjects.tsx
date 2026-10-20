@@ -88,11 +88,7 @@ export const createWorkspaceRouteObjects = ({
     },
     {
       path: AppPath.Index,
-      element: (
-        <LazyRoute>
-          <BusinessDashboardPage />
-        </LazyRoute>
-      ),
+      element: <RecordIndexSkeletonLoader />,
     },
     {
       path: AppPath.RecordIndexPage,

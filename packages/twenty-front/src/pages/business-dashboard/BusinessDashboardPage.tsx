@@ -1,173 +1,215 @@
-import { Box, Card, CardHeader, CardTitle, CardSection, Group, Text, Stack, SimpleGrid, Tooltip, Button, Anchor, Badge } from '@mantine/core';
-import { useTasks } from '@/modules/activities/tasks/hooks/useTasks';
-import { format, isToday, isPast, startOfToday, endOfToday } from 'date-fns';
+import { MobileHomeTaskRow } from '@/activities/tasks/components/MobileHomeTaskRow';
+import { useBusinessDashboardTasks } from '@/activities/tasks/hooks/useBusinessDashboardTasks';
 import { type Task } from '@/activities/types/Task';
-import { CalendarClockIcon } from '@tabler/icons-react';
-import { InboxIcon } from '@tabler/icons-react';
-import { FolderOpenIcon } from '@tabler/icons-react';
-import { Speedometer2Icon } from '@tabler/icons-react';
-import { useMemo } from 'react';
+import { PageCardHeader } from '@/modules/ui/layout/page/components/PageCardHeader';
+import { PageCardLayout } from '@/modules/ui/layout/page/components/PageCardLayout';
+import { PageTitle } from '@/modules/ui/utilities/page-title/components/PageTitle';
+import { styled } from '@linaria/react';
+import { type ReactNode } from 'react';
+import {
+  IconAlertTriangle,
+  IconClockHour8,
+  IconFolderOpen,
+  IconInbox,
+} from 'twenty-ui/icon';
+import { Card } from 'twenty-ui/primitives/surfaces';
+import { Text } from 'twenty-ui/primitives/typography';
+import { themeCssVariables } from 'twenty-ui/theme';
+
+const StyledScrollContainer = styled.div`
+  box-sizing: border-box;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: ${themeCssVariables.spacing[4]};
+  min-height: 0;
+  overflow-y: auto;
+  padding: ${themeCssVariables.spacing[4]};
+  width: 100%;
+`;
+
+const StyledStatsGrid = styled.div`
+  display: grid;
+  gap: ${themeCssVariables.spacing[3]};
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+`;
+
+const StyledStatCard = styled.div`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: ${themeCssVariables.border.radius.md};
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: ${themeCssVariables.spacing[2]};
+  padding: ${themeCssVariables.spacing[3]};
+`;
+
+const StyledStatHeader = styled.div`
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+`;
+
+const StyledStatLabel = styled(Text)`
+  color: ${themeCssVariables.font.color.secondary};
+  font-size: ${themeCssVariables.font.size.sm};
+  font-weight: ${themeCssVariables.font.weight.medium};
+`;
+
+const StyledStatValue = styled(Text)`
+  color: ${themeCssVariables.font.color.primary};
+  font-size: ${themeCssVariables.font.size.xxl};
+  font-weight: ${themeCssVariables.font.weight.semiBold};
+`;
+
+const StyledStatHint = styled(Text)`
+  color: ${themeCssVariables.font.color.tertiary};
+  font-size: ${themeCssVariables.font.size.xs};
+`;
+
+const StyledSection = styled.section`
+  display: flex;
+  flex-direction: column;
+  gap: ${themeCssVariables.spacing[2]};
+`;
+
+const StyledSectionHeader = styled.div`
+  align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 ${themeCssVariables.spacing[1]};
+`;
+
+const StyledSectionTitle = styled(Text)`
+  color: ${themeCssVariables.font.color.secondary};
+  font-size: ${themeCssVariables.font.size.md};
+  font-weight: ${themeCssVariables.font.weight.semiBold};
+`;
+
+const StyledSectionCount = styled(Text)`
+  color: ${themeCssVariables.font.color.tertiary};
+  font-weight: ${themeCssVariables.font.weight.regular};
+  margin-left: ${themeCssVariables.spacing[2]};
+`;
+
+const StyledListCard = styled.div`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.light};
+  border-radius: ${themeCssVariables.border.radius.md};
+  overflow: hidden;
+`;
+
+const StyledEmptyState = styled(Text)`
+  color: ${themeCssVariables.font.color.tertiary};
+  font-size: ${themeCssVariables.font.size.md};
+  padding: ${themeCssVariables.spacing[4]} ${themeCssVariables.spacing[3]};
+`;
+
+const StyledIconWrap = styled.span`
+  align-items: center;
+  display: flex;
+`;
+
+// Keep the command tower short: overdue work first, then what is due today,
+// five rows at most, the rest one click away on the tasks page.
+const URGENT_TASKS_LIMIT = 5;
+
+type BusinessDashboardStatCardProps = {
+  accent: string;
+  hint: string;
+  icon: ReactNode;
+  label: string;
+  value: string;
+};
+
+const BusinessDashboardStatCard = ({
+  accent,
+  hint,
+  icon,
+  label,
+  value,
+}: BusinessDashboardStatCardProps) => (
+  <StyledStatCard>
+    <StyledStatHeader>
+      <StyledIconWrap style={{ color: accent }}>{icon}</StyledIconWrap>
+      <StyledStatLabel>{label}</StyledStatLabel>
+    </StyledStatHeader>
+    <StyledStatValue style={{ color: accent }}>{value}</StyledStatValue>
+    <StyledStatHint>{hint}</StyledStatHint>
+  </StyledStatCard>
+);
 
 export const BusinessDashboardPage = () => {
-  const { tasks: allTasks, tasksLoading } = useTasks({ targetableObjects: [] });
+  const { overdue, today } = useBusinessDashboardTasks();
 
-  const tasks = useMemo(() => {
-    return allTasks.filter(task => task.__typename === 'Task') as Task[];
-  }, [allTasks]);
-
-  const overdueTasks = useMemo(() => {
-    return tasks.filter(task => {
-      const dueDate = task.dueDate ? new Date(task.dueDate) : null;
-      return dueDate && isPast(dueDate) && !task.isCompleted;
-    });
-  }, [tasks]);
-
-  const todayTasks = useMemo(() => {
-    return tasks.filter(task => {
-      const dueDate = task.dueDate ? new Date(task.dueDate) : null;
-      return dueDate && isToday(dueDate) && !task.isCompleted;
-    });
-  }, [tasks]);
-
-  // Placeholder for inquiries and cases - replace with actual data from relevant modules
-  const unrespondedInquiries = []; // TODO: fetch from emails/activities module
-  const pendingCases = []; // TODO: fetch from cases/objects module
-
-  if (tasksLoading) {
-    return <Box p={4}>Loading...</Box>;
-  }
+  const urgentTasks: Task[] = [...overdue.tasks, ...today.tasks].slice(
+    0,
+    URGENT_TASKS_LIMIT,
+  );
+  const urgentTaskCount = overdue.totalCount + today.totalCount;
+  const isLoading = overdue.loading || today.loading;
 
   return (
-    <Box p={4}>
-      <Stack spacing={4}>
-        {/* Title */}
-        <Group position="center">
-          <Text size="xl" fw={700}>REALIFE 業務ダッシュボード</Text>
-        </Group>
+    <>
+      <PageTitle title="REALIFE 業務ダッシュボード" />
+      <PageCardLayout
+        header={<PageCardHeader title="REALIFE 業務ダッシュボード" />}
+      >
+        <StyledScrollContainer>
+          <StyledStatsGrid>
+            <BusinessDashboardStatCard
+              accent={themeCssVariables.font.color.danger}
+              hint="期限を过了した未完了タスク"
+              icon={<IconAlertTriangle size={16} />}
+              label="期限超過タスク"
+              value={isLoading ? '…' : `${overdue.totalCount}`}
+            />
+            <BusinessDashboardStatCard
+              accent={themeCssVariables.tag.text.blue}
+              hint="今日中に対応するタスク"
+              icon={<IconClockHour8 size={16} />}
+              label="本日のタスク"
+              value={isLoading ? '…' : `${today.totalCount}`}
+            />
+            <BusinessDashboardStatCard
+              accent={themeCssVariables.tag.text.orange}
+              hint="返信待ちの問い合わせ（データ連携は未設定）"
+              icon={<IconInbox size={16} />}
+              label="未対応問い合わせ"
+              value="—"
+            />
+            <BusinessDashboardStatCard
+              accent={themeCssVariables.tag.text.green}
+              hint="進换待ちの案件（データ連携は未設定）"
+              icon={<IconFolderOpen size={16} />}
+              label="対応待ち案件"
+              value="—"
+            />
+          </StyledStatsGrid>
 
-        {/* Four Cards Grid */}
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing={4}>
-          {/* Overdue Tasks Card */}
-          <Card>
-            <CardHeader withBorder>
-              <Group position="left">
-                <CalendarClockIcon size={24} color="red" />
-                <CardTitle size={4}>期限超過タスク</CardTitle>
-              </Group>
-            </CardHeader>
-            <CardSection p={4}>
-              <Text size={2xl} fw={600} color="red">
-                {overdueTasks.length}
-              </Text>
-              <Text size={xs} color="dimmed">今日までに完了すべきタスク</Text>
-            </CardSection>
-          </Card>
-
-          {/* Today's Tasks Card */}
-          <Card>
-            <CardHeader withBorder>
-              <Group position="left">
-                <CalendarClockIcon size={24} color="blue" />
-                <CardTitle size={4}>本日のタスク</CardTitle>
-              </Group>
-            </CardHeader>
-            <CardSection p={4}>
-              <Text size={2xl} fw={600} color="blue">
-                {todayTasks.length}
-              </Text>
-              <Text size={xs} color="dimmed">今日中に対応するタスク</Text>
-            </CardSection>
-          </Card>
-
-          {/* Unresponded Inquiries Card */}
-          <Card>
-            <CardHeader withBorder>
-              <Group position="left">
-                <InboxIcon size={24} color="orange" />
-                <CardTitle size={4}>未対応問い合わせ</CardTitle>
-              </Group>
-            </CardHeader>
-            <CardSection p={4}>
-              <Text size={2xl} fw={600} color="orange">
-                {unrespondedInquiries.length}
-              </Text>
-              <Text size={xs} color="dimmed">返信が必要な問い合わせ</Text>
-            </CardSection>
-          </Card>
-
-          {/* Pending Cases Card */}
-          <Card>
-            <CardHeader withBorder>
-              <Group position="left">
-                <FolderOpenIcon size={24} color="green" />
-                <CardTitle size={4}>対応待ち案件</CardTitle>
-              </Group>
-            </CardHeader>
-            <CardSection p={4}>
-              <Text size={2xl} fw={600} color="green">
-                {pendingCases.length}
-              </Text>
-              <Text size={xs} color="dimmed">進捗待ちの案件・プロジェクト</Text>
-            </CardSection>
-          </Card>
-        </SimpleGrid>
-
-        {/* Command Tower: 今すぐ対応すること */}
-        <Stack spacing={3} mt={6}>
-          <Text size="lg" fw={600}>今すぐ対応すること</Text>
-          <Box>
-            {/* Urgent tasks: overdue + today */}
-            {[
-              ...overdueTasks.map(task => ({ task, type: 'overdue' as const })),
-              ...todayTasks.map(task => ({ task, type: 'today' as const }))
-            ]
-              .sort((a, b) => {
-                // Sort by urgency: overdue first, then today, then by due date
-                const dateA = a.task.dueDate ? new Date(a.task.dueDate) : new Date(0);
-                const dateB = b.task.dueDate ? new Date(b.task.dueDate) : new Date(0);
-                if (a.type === 'overdue' && b.type !== 'overdue') return -1;
-                if (a.type !== 'overdue' && b.type === 'overdue') return 1;
-                if (a.type === 'today' && b.type !== 'today') return -1;
-                if (a.type !== 'today' && b.type === 'today') return 1;
-                return dateA.getTime() - dateB.getTime();
-              })
-              .slice(0, 5) // Show top 5 urgent tasks
-              .map(({ task, type }) => (
-                <Box key={task.id} p={3} withBorder radius="md">
-                  <Group position="left" align="center">
-                    {type === 'overdue' && (
-                      <Badge variant="light" color="red">
-                        期限超過
-                      </Badge>
-                    )}
-                    {type === 'today' && (
-                      <Badge variant="light" color="blue">
-                        本日
-                      </Badge>
-                    )}
-                    <Box ml={4} grow>
-                      <Text size="sm" fw={500}>{task.title ?? '(無題)'}</Text>
-                      <Text size="xs" color="dimmed">
-                        {task.dueDate ? format(new Date(task.dueDate), 'MM/dd HH:mm') : '日付未設定'}
-                      </Text>
-                    </Box>
-                    <Button
-                      variant="outline"
-                      size="xs"
-                      color={type === 'overdue' ? 'red' : 'blue'}
-                      onClick={() => {
-                        // TODO: navigate to task detail or open completion modal
-                        alert(`タスク "${task.title}" の対応を開始します`);
-                      }}
-                    >
-                      対応開始
-                    </Button>
-                  </Group>
-                </Box>
+          <StyledSection>
+            <StyledSectionHeader>
+              <StyledSectionTitle>
+                今すぐ対応すること
+                {!isLoading && urgentTaskCount > 0 && (
+                  <StyledSectionCount>{urgentTaskCount}</StyledSectionCount>
+                )}
+              </StyledSectionTitle>
+            </StyledSectionHeader>
+            <StyledListCard>
+              {!isLoading && urgentTasks.length === 0 && (
+                <StyledEmptyState>
+                  対応が必要なタスクはありません
+                </StyledEmptyState>
+              )}
+              {urgentTasks.map((task) => (
+                <MobileHomeTaskRow key={task.id} task={task} />
               ))}
-          </Box>
-        </Stack>
-      </Stack>
-    </Box>
+            </StyledListCard>
+          </StyledSection>
+        </StyledScrollContainer>
+      </PageCardLayout>
+    </>
   );
 };
