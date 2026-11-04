@@ -1,0 +1,14 @@
+when:
+  event:
+    - push
+    - pull_request
+
+steps:
+  - name: checks
+    image: node:24-alpine
+    commands:
+      - "corepack enable"
+      - "yarn workspaces focus twenty-monorepo twenty-front twenty-front-component-renderer twenty-ui twenty-shared twenty-sdk twenty-client-sdk"
+      - "npx nx run twenty-front:lingui:extract"
+      - "npx nx run twenty-front:lingui:compile"
+      - "NODE_OPTIONS=--max-old-space-size=12288 npx nx build twenty-front"
